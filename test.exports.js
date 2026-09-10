@@ -33,3 +33,34 @@ describe('package.json exports map', () => {
 		assert.strictEqual(pkg.browser, './src/browser.js');
 	});
 });
+
+describe('exports map targets', () => {
+	function collectStringTargets(node, skipKey) {
+		const targets = [];
+		for (const [key, value] of Object.entries(node)) {
+			if (key === skipKey) {
+				continue;
+			}
+			if (typeof value === 'string') {
+				targets.push(value);
+			} else if (value && typeof value === 'object') {
+				targets.push(...collectStringTargets(value, skipKey));
+			}
+		}
+		return targets;
+	}
+
+	it('every target exists on disk and is covered by "files"', () => {
+		const targets = collectStringTargets(pkg.exports, './package.json');
+		assert.ok(targets.length > 0, 'expected at least one exports target to check');
+
+		for (const target of targets) {
+			const relativePath = target.replace(/^\.\//, '');
+			const absolutePath = path.join(__dirname, relativePath);
+			assert.ok(fs.existsSync(absolutePath), `expected exports target "${target}" to exist on disk`);
+
+			const covered = pkg.files.some(entry => relativePath === entry || relativePath.startsWith(entry + '/'));
+			assert.ok(covered, `expected "files" to cover exports target "${target}"`);
+		}
+	});
+});
