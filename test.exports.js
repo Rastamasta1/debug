@@ -64,3 +64,31 @@ describe('exports map targets', () => {
 		}
 	});
 });
+
+describe('src/index.js require specifiers match exports map', () => {
+	function collectRequireSpecifiers(source) {
+		const specifiers = [];
+		const requireRe = /require\(\s*(['"])(.*?)\1\s*\)/g;
+		let match;
+		while ((match = requireRe.exec(source)) !== null) {
+			specifiers.push(match[2]);
+		}
+		return specifiers;
+	}
+
+	it('every require() specifier in src/index.js resolves to a file named by the exports map', () => {
+		const indexPath = path.join(__dirname, 'src', 'index.js');
+		const source = fs.readFileSync(indexPath, 'utf8');
+		const specifiers = collectRequireSpecifiers(source);
+		assert.ok(specifiers.length > 0, 'expected src/index.js to contain at least one require() call');
+
+		const dotExport = pkg.exports['.'];
+		const mapTargets = new Set(Object.values(dotExport).map(target => path.normalize(target.replace(/^\.\//, ''))));
+
+		for (const specifier of specifiers) {
+			const resolvedAbsolute = path.resolve(path.dirname(indexPath), specifier);
+			const resolvedRelative = path.normalize(path.relative(__dirname, resolvedAbsolute));
+			assert.ok(mapTargets.has(resolvedRelative), `expected require() specifier "${specifier}" (resolved to "${resolvedRelative}") to correspond to a target named by the exports map`);
+		}
+	});
+});
